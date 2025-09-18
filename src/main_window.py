@@ -314,5 +314,12 @@ class VideoDownloaderApp(QMainWindow):
     def closeEvent(self, event):
         """Đóng kết nối database khi đóng ứng dụng"""
         if self.db:
-            asyncio.create_task(self.db.close())
+            try:
+                # Tạo event loop mới để đóng database
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(self.db.close())
+                loop.close()
+            except Exception as e:
+                print(f"Lỗi khi đóng database: {e}")
         event.accept()
