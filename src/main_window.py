@@ -7,7 +7,7 @@ import asyncio
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QLineEdit, QPushButton, QSpinBox, QTableWidget, 
                              QTableWidgetItem, QLabel, QProgressBar, QHeaderView, 
-                             QMessageBox, QInputDialog)
+                             QMessageBox, QInputDialog, QCheckBox)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
 from .DBF import Database, insert_db, fetch_all, fetch_one, update_db
@@ -79,11 +79,12 @@ class VideoDownloaderApp(QMainWindow):
         self.link_input = QLineEdit()
         self.link_input.setPlaceholderText("Nhập link video...")
         self.link_input.setMinimumHeight(35)
+        self.link_input.textChanged.connect(self.detect_platform)
         
-        # Button để thêm video
-        self.add_button = QPushButton("Thêm Video")
-        self.add_button.setMinimumHeight(35)
-        self.add_button.clicked.connect(self.add_video)
+        # Khu vực hiển thị platform
+        self.platform_display = QLabel("Chưa chọn platform")
+        self.platform_display.setMinimumHeight(35)
+        self.platform_display.setStyleSheet("QLabel { padding: 5px; border: 1px solid #ccc; border-radius: 3px; }")
         
         # Spinbox cho số luồng tải xuống
         self.threads_spinbox = QSpinBox()
@@ -97,7 +98,7 @@ class VideoDownloaderApp(QMainWindow):
         # Thêm các widget vào layout
         input_layout.addWidget(QLabel("Link Video:"))
         input_layout.addWidget(self.link_input)
-        input_layout.addWidget(self.add_button)
+        input_layout.addWidget(self.platform_display)
         input_layout.addWidget(threads_label)
         input_layout.addWidget(self.threads_spinbox)
         
@@ -125,10 +126,18 @@ class VideoDownloaderApp(QMainWindow):
         self.search_button = QPushButton("Tìm kiếm")
         self.search_button.clicked.connect(self.search_videos)
         
+        self.load_info_button = QPushButton("Load thông tin")
+        self.load_info_button.clicked.connect(self.load_video_info)
+        
+        # Checkbox cho tải ngay sau khi load
+        self.auto_download_checkbox = QCheckBox("Tải ngay sau khi load")
+        
         control_layout.addWidget(self.start_button)
         control_layout.addWidget(self.pause_button)
         control_layout.addWidget(self.clear_button)
         control_layout.addWidget(self.search_button)
+        control_layout.addWidget(self.load_info_button)
+        control_layout.addWidget(self.auto_download_checkbox)
         control_layout.addStretch()
         
         parent_layout.addLayout(control_layout)
@@ -152,45 +161,6 @@ class VideoDownloaderApp(QMainWindow):
         # Cho phép sắp xếp
         self.table.setSortingEnabled(True)
         
-    def add_video(self):
-        """Thêm video mới vào bảng"""
-        link = self.link_input.text().strip()
-        if not link:
-            QMessageBox.warning(self, "Cảnh báo", "Vui lòng nhập link video!")
-            return
-            
-        # Chạy async function
-        asyncio.create_task(self._add_video_async(link))
-        
-    async def _add_video_async(self, link):
-        """Async function để thêm video"""
-        try:
-            # Thêm vào database
-            insert_sql = '''
-                INSERT INTO videos (title, views, likes, duration, status, 
-                                  progress, original_link, video_id, file_path)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            '''
-            record_id = await insert_db(
-                insert_sql,
-                "Đang tải thông tin...", 0, 0, "00:00",
-                DownloadStatus.PENDING, 0, link, "", ""
-            )
-            
-            if record_id:
-                # Thêm vào bảng
-                self.add_row_to_table(record_id, "Đang tải thông tin...", 0, 0, "00:00", 
-                                     DownloadStatus.PENDING, 0, link, "", "")
-                
-                # Xóa link input
-                self.link_input.clear()
-                
-                QMessageBox.information(self, "Thành công", "Video đã được thêm vào danh sách!")
-            else:
-                QMessageBox.critical(self, "Lỗi", "Không thể thêm video vào database!")
-                
-        except Exception as e:
-            QMessageBox.critical(self, "Lỗi", f"Lỗi thêm video: {str(e)}")
         
     def add_row_to_table(self, record_id, title, views, likes, duration, 
                         status, progress, original_link, video_id, file_path):
@@ -253,6 +223,65 @@ class VideoDownloaderApp(QMainWindow):
         keyword, ok = QInputDialog.getText(self, "Tìm kiếm", "Nhập từ khóa tìm kiếm:")
         if ok and keyword:
             asyncio.create_task(self._search_videos_async(keyword))
+            
+    def load_video_info(self):
+        """Load thông tin video"""
+        QMessageBox.information(self, "Thông báo", "Chức năng load thông tin video sẽ được triển khai!")
+        
+    def detect_platform(self, text):
+        """Phát hiện platform từ link"""
+        if not text.strip():
+            self.platform_display.setText("Chưa chọn platform")
+            self.platform_display.setStyleSheet("QLabel { padding: 5px; border: 1px solid #ccc; border-radius: 3px; }")
+            return
+            
+        text_lower = text.lower()
+        
+        # Định nghĩa các platform
+        platforms = {
+            'facebook': {
+                'keywords': ['facebook.com', 'fb.com', 'm.facebook.com'],
+                'icon': '📘',
+                'name': 'Facebook'
+            },
+            'tiktok': {
+                'keywords': ['tiktok.com', 'vm.tiktok.com'],
+                'icon': '🎵',
+                'name': 'TikTok'
+            },
+            'instagram': {
+                'keywords': ['instagram.com', 'instagr.am'],
+                'icon': '📷',
+                'name': 'Instagram'
+            },
+            'youtube': {
+                'keywords': ['youtube.com', 'youtu.be', 'm.youtube.com'],
+                'icon': '📺',
+                'name': 'YouTube'
+            },
+            'douyin': {
+                'keywords': ['douyin.com', 'iesdouyin.com'],
+                'icon': '🎪',
+                'name': 'Douyin'
+            }
+        }
+        
+        detected_platform = None
+        for platform_key, platform_info in platforms.items():
+            for keyword in platform_info['keywords']:
+                if keyword in text_lower:
+                    detected_platform = platform_info
+                    break
+            if detected_platform:
+                break
+        
+        if detected_platform:
+            display_text = f"{detected_platform['icon']} {detected_platform['name']}"
+            self.platform_display.setText(display_text)
+            self.platform_display.setStyleSheet("QLabel { padding: 5px; border: 1px solid #4CAF50; border-radius: 3px; background-color: #E8F5E8; }")
+        else:
+            self.platform_display.setText("❌ Platform không hỗ trợ")
+            self.platform_display.setStyleSheet("QLabel { padding: 5px; border: 1px solid #f44336; border-radius: 3px; background-color: #FFEBEE; }")
             
     async def _search_videos_async(self, keyword):
         """Async function để tìm kiếm video"""
