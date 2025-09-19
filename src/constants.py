@@ -39,6 +39,35 @@ class DownloadStatus:
     FAILED = "failed"
     PAUSED = "paused"
 
+# Định nghĩa các platform được hỗ trợ
+PLATFORMS = {
+    'facebook': {
+        'keywords': ['facebook.com', 'fb.com', 'm.facebook.com'],
+        'emoji': '📘',
+        'name': 'Facebook'
+    },
+    'tiktok': {
+        'keywords': ['tiktok.com', 'vm.tiktok.com'],
+        'emoji': '🎵',
+        'name': 'TikTok'
+    },
+    'instagram': {
+        'keywords': ['instagram.com', 'instagr.am'],
+        'emoji': '📷',
+        'name': 'Instagram'
+    },
+    'youtube': {
+        'keywords': ['youtube.com', 'youtu.be', 'm.youtube.com'],
+        'emoji': '📺',
+        'name': 'YouTube'
+    },
+    'douyin': {
+        'keywords': ['douyin.com', 'iesdouyin.com'],
+        'emoji': '🎭',
+        'name': 'Douyin'
+    }
+}
+
 # Cấu hình ứng dụng
 class AppConfig:
     WINDOW_TITLE = "Video Downloader Tool"
