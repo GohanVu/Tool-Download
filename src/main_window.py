@@ -54,8 +54,8 @@ class VideoDownloaderApp(QMainWindow):
         
         # Kết nối signals
         self.input_section.link_input.textChanged.connect(self.detect_platform)
+        self.input_section.connect_start_button(self.start_download)
         self.control_section.connect_signals(
-            self.start_download,
             self.pause_download,
             self.clear_all,
             self.search_videos,
