@@ -22,7 +22,9 @@ class InputSection(QWidget):
         self.start_button = None
         self.multiple_links_title = None
         self.clear_multiple_links_button = None
+        self.edit_multiple_links_button = None
         self.multiple_links_count = 0
+        self.current_links = []
         self.init_ui()
         
     def init_ui(self):
@@ -155,6 +157,29 @@ class InputSection(QWidget):
         title_layout.addStretch()
         title_layout.addWidget(self.multiple_links_title)
         
+        # Nút chỉnh sửa để edit multiple links (ẩn ban đầu)
+        self.edit_multiple_links_button = QPushButton("...")
+        self.edit_multiple_links_button.setFixedSize(25, 25)
+        self.edit_multiple_links_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                border: 1px solid #388E3C;
+                border-radius: 12px;
+                color: white;
+                font-weight: bold;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: #66BB6A;
+                border-color: #43A047;
+            }
+            QPushButton:pressed {
+                background-color: #388E3C;
+                border-color: #2E7D32;
+            }
+        """)
+        self.edit_multiple_links_button.hide()  # Ẩn ban đầu
+        
         # Nút X đỏ để xóa multiple links (ẩn ban đầu)
         self.clear_multiple_links_button = QPushButton("✕")
         self.clear_multiple_links_button.setFixedSize(25, 25)
@@ -178,6 +203,7 @@ class InputSection(QWidget):
         """)
         self.clear_multiple_links_button.hide()  # Ẩn ban đầu
         
+        title_layout.addWidget(self.edit_multiple_links_button)
         title_layout.addWidget(self.clear_multiple_links_button)
         title_layout.addStretch()
         
@@ -245,11 +271,18 @@ class InputSection(QWidget):
         """Kết nối signal cho nút xóa multiple links"""
         self.clear_multiple_links_button.clicked.connect(callback)
         
-    def set_multiple_links_mode(self, links_count):
+    def connect_edit_multiple_links_button(self, callback):
+        """Kết nối signal cho nút chỉnh sửa multiple links"""
+        self.edit_multiple_links_button.clicked.connect(callback)
+        
+    def set_multiple_links_mode(self, links_count, links_list=None):
         """Chuyển sang chế độ multiple links"""
         self.multiple_links_count = links_count
+        if links_list:
+            self.current_links = links_list.copy()
         
-        # Cập nhật link input placeholder
+        # Clear text hiện tại và cập nhật link input placeholder
+        self.link_input.clear()
         self.link_input.setPlaceholderText(f"✅ Đã thêm {links_count} link")
         self.link_input.setReadOnly(True)
         self.link_input.setStyleSheet("""
@@ -289,7 +322,8 @@ class InputSection(QWidget):
         """)
         self.multiple_links_title.setCursor(Qt.CursorShape.ArrowCursor)
         
-        # Hiển thị nút X đỏ
+        # Hiển thị nút chỉnh sửa và nút X đỏ
+        self.edit_multiple_links_button.show()
         self.clear_multiple_links_button.show()
         
         # Cập nhật text button bắt đầu tải
@@ -298,6 +332,7 @@ class InputSection(QWidget):
     def clear_multiple_links_mode(self):
         """Xóa chế độ multiple links, trở về bình thường"""
         self.multiple_links_count = 0
+        self.current_links = []
         
         # Khôi phục link input
         self.link_input.setPlaceholderText("Nhập link video...")
@@ -346,7 +381,8 @@ class InputSection(QWidget):
         """)
         self.multiple_links_title.setCursor(Qt.CursorShape.PointingHandCursor)
         
-        # Ẩn nút X đỏ
+        # Ẩn nút chỉnh sửa và nút X đỏ
+        self.edit_multiple_links_button.hide()
         self.clear_multiple_links_button.hide()
         
         # Khôi phục text button bắt đầu tải
@@ -359,6 +395,10 @@ class InputSection(QWidget):
     def is_multiple_links_mode(self):
         """Kiểm tra có đang ở chế độ multiple links không"""
         return self.multiple_links_count > 0
+        
+    def get_current_links(self):
+        """Lấy danh sách links hiện tại"""
+        return self.current_links.copy()
             
 
 
@@ -588,3 +628,11 @@ class MultipleLinksDialog(QDialog):
         # Tách các link theo dòng và loại bỏ dòng trống
         links = [link.strip() for link in text.split('\n') if link.strip()]
         return links
+        
+    def set_links(self, links):
+        """Đặt danh sách links vào text edit"""
+        if links:
+            links_text = '\n'.join(links)
+            self.links_text_edit.setPlainText(links_text)
+        else:
+            self.links_text_edit.clear()
