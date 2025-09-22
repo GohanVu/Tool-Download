@@ -7,7 +7,7 @@ import asyncio
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QTableWidget, 
                              QMessageBox, QInputDialog)
 from PyQt6.QtCore import Qt
-from .ui_components import InputSection, ControlSection
+from .ui_components import InputSection, ControlSection, MultipleLinksDialog
 from .table_manager import VideoTableManager
 from .platform_detector import PlatformDetector
 from .database_manager import VideoDatabaseManager
@@ -55,6 +55,8 @@ class VideoDownloaderApp(QMainWindow):
         # Kết nối signals
         self.input_section.link_input.textChanged.connect(self.detect_platform)
         self.input_section.connect_start_button(self.start_download)
+        self.input_section.connect_multiple_links_title(self.open_multiple_links_dialog)
+        self.input_section.connect_clear_multiple_links_button(self.clear_multiple_links)
         self.control_section.connect_signals(
             self.pause_download,
             self.clear_all,
@@ -74,7 +76,38 @@ class VideoDownloaderApp(QMainWindow):
         
     def start_download(self):
         """Bắt đầu tải xuống"""
-        QMessageBox.information(self, "Thông báo", "Chức năng tải xuống sẽ được triển khai!")
+        if self.input_section.is_multiple_links_mode():
+            links_count = self.input_section.get_multiple_links_count()
+            QMessageBox.information(self, "Thông báo", 
+                                  f"Bắt đầu tải {links_count} link. Chức năng tải xuống sẽ được triển khai!")
+        else:
+            QMessageBox.information(self, "Thông báo", "Chức năng tải xuống sẽ được triển khai!")
+        
+    def open_multiple_links_dialog(self):
+        """Mở cửa sổ nhập nhiều link"""
+        # Kiểm tra nếu đã ở chế độ multiple links
+        if self.input_section.is_multiple_links_mode():
+            QMessageBox.information(self, "Thông báo", 
+                                  f"Đã có {self.input_section.get_multiple_links_count()} link. "
+                                  "Nhấn nút X đỏ để xóa và thêm link mới.")
+            return
+            
+        dialog = MultipleLinksDialog(self)
+        if dialog.exec() == dialog.DialogCode.Accepted:
+            links = dialog.get_links()
+            if links:
+                # Chuyển sang chế độ multiple links
+                self.input_section.set_multiple_links_mode(len(links))
+                QMessageBox.information(self, "Thành công", 
+                                      f"Đã thêm {len(links)} link vào danh sách tải!")
+                print(f"Danh sách link: {links}")
+            else:
+                QMessageBox.warning(self, "Cảnh báo", "Vui lòng nhập ít nhất một link!")
+                
+    def clear_multiple_links(self):
+        """Xóa chế độ multiple links"""
+        self.input_section.clear_multiple_links_mode()
+        QMessageBox.information(self, "Thông báo", "Đã xóa danh sách link!")
         
     def pause_download(self):
         """Tạm dừng tải xuống"""
