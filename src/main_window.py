@@ -5,12 +5,13 @@ Chứa giao diện chính của ứng dụng
 
 import asyncio
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QTableWidget, 
-                             QMessageBox, QInputDialog)
+                             QInputDialog)
 from PyQt6.QtCore import Qt
 from .ui_components import InputSection, ControlSection, MultipleLinksDialog
 from .table_manager import VideoTableManager
 from .platform_detector import PlatformDetector
 from .database_manager import VideoDatabaseManager
+from .message_manager import MessageManager
 from .constants import AppConfig
 
 class VideoDownloaderApp(QMainWindow):
@@ -19,6 +20,7 @@ class VideoDownloaderApp(QMainWindow):
         # Khởi tạo các manager
         self.db_manager = VideoDatabaseManager()
         self.platform_detector = PlatformDetector()
+        self.message_manager = MessageManager(self)
         self.table_manager = None
         
         # Khởi tạo UI components
@@ -57,6 +59,7 @@ class VideoDownloaderApp(QMainWindow):
         self.input_section.connect_start_button(self.start_download)
         self.input_section.connect_multiple_links_title(self.open_multiple_links_dialog)
         self.input_section.connect_clear_multiple_links_button(self.clear_multiple_links)
+        self.input_section.connect_edit_multiple_links_button(self.edit_multiple_links)
         self.control_section.connect_signals(
             self.pause_download,
             self.clear_all,
@@ -78,18 +81,16 @@ class VideoDownloaderApp(QMainWindow):
         """Bắt đầu tải xuống"""
         if self.input_section.is_multiple_links_mode():
             links_count = self.input_section.get_multiple_links_count()
-            QMessageBox.information(self, "Thông báo", 
-                                  f"Bắt đầu tải {links_count} link. Chức năng tải xuống sẽ được triển khai!")
+            self.message_manager.download_started(links_count)
         else:
-            QMessageBox.information(self, "Thông báo", "Chức năng tải xuống sẽ được triển khai!")
+            self.message_manager.download_started()
         
     def open_multiple_links_dialog(self):
         """Mở cửa sổ nhập nhiều link"""
         # Kiểm tra nếu đã ở chế độ multiple links
         if self.input_section.is_multiple_links_mode():
-            QMessageBox.information(self, "Thông báo", 
-                                  f"Đã có {self.input_section.get_multiple_links_count()} link. "
-                                  "Nhấn nút X đỏ để xóa và thêm link mới.")
+            links_count = self.input_section.get_multiple_links_count()
+            self.message_manager.multiple_links_already_exists(links_count)
             return
             
         dialog = MultipleLinksDialog(self)
@@ -97,29 +98,47 @@ class VideoDownloaderApp(QMainWindow):
             links = dialog.get_links()
             if links:
                 # Chuyển sang chế độ multiple links
-                self.input_section.set_multiple_links_mode(len(links))
-                QMessageBox.information(self, "Thành công", 
-                                      f"Đã thêm {len(links)} link vào danh sách tải!")
+                self.input_section.set_multiple_links_mode(len(links), links)
+                self.message_manager.multiple_links_added_success(len(links))
                 print(f"Danh sách link: {links}")
             else:
-                QMessageBox.warning(self, "Cảnh báo", "Vui lòng nhập ít nhất một link!")
+                self.message_manager.multiple_links_empty_warning()
                 
     def clear_multiple_links(self):
         """Xóa chế độ multiple links"""
-        self.input_section.clear_multiple_links_mode()
-        QMessageBox.information(self, "Thông báo", "Đã xóa danh sách link!")
+        if self.message_manager.multiple_links_clear_confirm():
+            self.input_section.clear_multiple_links_mode()
+            self.message_manager.multiple_links_cleared_success()
+        
+    def edit_multiple_links(self):
+        """Chỉnh sửa danh sách multiple links"""
+        if not self.input_section.is_multiple_links_mode():
+            return
+            
+        # Lấy danh sách links hiện tại
+        current_links = self.input_section.get_current_links()
+        
+        # Mở dialog với links hiện tại
+        dialog = MultipleLinksDialog(self)
+        dialog.set_links(current_links)
+        
+        if dialog.exec() == dialog.DialogCode.Accepted:
+            new_links = dialog.get_links()
+            if new_links:
+                # Cập nhật danh sách links mới
+                self.input_section.set_multiple_links_mode(len(new_links), new_links)
+                self.message_manager.multiple_links_updated_success(len(new_links))
+                print(f"Danh sách link mới: {new_links}")
+            else:
+                self.message_manager.multiple_links_edit_empty_warning()
         
     def pause_download(self):
         """Tạm dừng tải xuống"""
-        QMessageBox.information(self, "Thông báo", "Chức năng tạm dừng sẽ được triển khai!")
+        self.message_manager.download_paused()
         
     def clear_all(self):
         """Xóa tất cả dữ liệu"""
-        reply = QMessageBox.question(self, "Xác nhận", 
-                                   "Bạn có chắc chắn muốn xóa tất cả dữ liệu?",
-                                   QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        
-        if reply == QMessageBox.StandardButton.Yes:
+        if self.message_manager.clear_all_confirm():
             asyncio.create_task(self._clear_all_async())
             
     async def _clear_all_async(self):
@@ -127,9 +146,9 @@ class VideoDownloaderApp(QMainWindow):
         try:
             await self.db_manager.delete_all_videos()
             self.table_manager.clear_table()
-            QMessageBox.information(self, "Thành công", "Đã xóa tất cả dữ liệu!")
+            self.message_manager.clear_all_success()
         except Exception as e:
-            QMessageBox.critical(self, "Lỗi", f"Không thể xóa dữ liệu: {str(e)}")
+            self.message_manager.clear_all_error(str(e))
                 
     def search_videos(self):
         """Tìm kiếm video"""
@@ -139,7 +158,7 @@ class VideoDownloaderApp(QMainWindow):
             
     def load_video_info(self):
         """Load thông tin video"""
-        QMessageBox.information(self, "Thông báo", "Chức năng load thông tin video sẽ được triển khai!")
+        self.message_manager.load_info_placeholder()
         
     def detect_platform(self, text):
         """Phát hiện platform từ link"""
@@ -157,7 +176,7 @@ class VideoDownloaderApp(QMainWindow):
             results = await self.db_manager.search_videos(keyword)
             self.table_manager.load_data(results)
         except Exception as e:
-            QMessageBox.critical(self, "Lỗi", f"Lỗi tìm kiếm: {str(e)}")
+            self.message_manager.search_error(str(e))
             
     async def load_data_from_db(self):
         """Tải dữ liệu từ database vào bảng"""
