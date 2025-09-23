@@ -77,3 +77,11 @@ class AppConfig:
     DEFAULT_THREADS = 4
     MIN_THREADS = 1
     MAX_THREADS = 10
+    CONFIG_FILE = "app_config.json"
+    
+# Giá trị mặc định cho filter
+class FilterDefaults:
+    MAX_VIDEOS = 9999
+    MIN_VIEWS = 0
+    MIN_LIKES = 0
+    MIN_DURATION = 0

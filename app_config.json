@@ -1,0 +1,8 @@
+{
+    "filter": {
+        "max_videos": 10000,
+        "min_views": 0,
+        "min_likes": 0,
+        "min_duration": 0
+    }
+}

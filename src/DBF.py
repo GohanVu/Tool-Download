@@ -25,7 +25,7 @@ class Database:
             self.connection = await aiosqlite.connect(self.db_path, timeout=self.timeout)
             await self.connection.execute("PRAGMA journal_mode=WAL;")
             await self.connection.commit()
-            logger.info("Connected to the database and set journal_mode to WAL.")
+            # logger.info("Connected to the database and set journal_mode to WAL.")
 
     async def close(self):
         if self.connection:

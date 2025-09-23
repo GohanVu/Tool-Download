@@ -4,9 +4,12 @@ Chứa giao diện chính của ứng dụng
 """
 
 import asyncio
+import time
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QTableWidget, 
                              QInputDialog)
 from PyQt6.QtCore import Qt
+
+from src.yt_loader import YoutuberAssistant
 from .ui_components import InputSection, ControlSection, MultipleLinksDialog
 from .table_manager import VideoTableManager
 from .platform_detector import PlatformDetector
@@ -79,11 +82,16 @@ class VideoDownloaderApp(QMainWindow):
         
     def start_download(self):
         """Bắt đầu tải xuống"""
+        # Lấy giá trị filter
+        filter_values = self.input_section.get_filter_values()
+        
         if self.input_section.is_multiple_links_mode():
             links_count = self.input_section.get_multiple_links_count()
             self.message_manager.download_started(links_count)
+            print(f"Filter values: {filter_values}")
         else:
             self.message_manager.download_started()
+            print(f"Filter values: {filter_values}")
         
     def open_multiple_links_dialog(self):
         """Mở cửa sổ nhập nhiều link"""
@@ -158,7 +166,23 @@ class VideoDownloaderApp(QMainWindow):
             
     def load_video_info(self):
         """Load thông tin video"""
-        self.message_manager.load_info_placeholder()
+        # Lấy 7 giá trị từ các ô input và filter
+        platform = self.input_section.platform_display.text()
+        link = self.input_section.link_input.text()
+        threads = self.input_section.threads_spinbox.value()
+        
+        # Lấy giá trị từ filter
+        filter_values = self.input_section.get_filter_values()
+        max_videos = filter_values['max_videos']
+        min_views = filter_values['min_videos']  # Lưu ý: tên method là get_min_videos nhưng thực tế là min_views
+        min_likes = filter_values['min_likes']
+        min_duration = filter_values['min_duration']
+        
+        
+        self.yt_assistant = YoutuberAssistant(platform, link, threads, max_videos, min_views, min_likes, min_duration)
+        # self.mang.append(yt_assistant)
+        self.yt_assistant.start()
+        # self.message_manager.load_info_placeholder()
         
     def detect_platform(self, text):
         """Phát hiện platform từ link"""
