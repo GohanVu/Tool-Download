@@ -14,10 +14,13 @@ def main():
     
     # Sử dụng QTimer để khởi tạo database sau khi event loop đã chạy
     def init_database_async():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(window.init_database())
-        loop.close()
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(window.init_database())
+            loop.close()
+        except Exception as e:
+            print(f"Lỗi khởi tạo database: {e}")
     
     # Chạy init database sau 100ms
     QTimer.singleShot(100, init_database_async)

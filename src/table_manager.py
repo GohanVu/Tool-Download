@@ -3,7 +3,7 @@ Table Manager cho Video Downloader Tool
 Quản lý bảng hiển thị dữ liệu video
 """
 
-from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QProgressBar, QHeaderView
+from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QProgressBar, QHeaderView, QTableWidget
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from .constants import TableColumns, COLUMN_HEADERS
@@ -12,7 +12,7 @@ from .constants import TableColumns, COLUMN_HEADERS
 class VideoTableManager:
     """Quản lý bảng hiển thị video"""
     
-    def __init__(self, table_widget):
+    def __init__(self, table_widget : QTableWidget):
         self.table = table_widget
         self.setup_table()
         
@@ -65,6 +65,35 @@ class VideoTableManager:
             
         self.table.setCellWidget(row_position, TableColumns.PROGRESS, progress_bar)
         
+    def add_video_row(self, video_data):
+        """Thêm một dòng video mới từ dict data"""
+        row_position = self.table.rowCount()
+        self.table.insertRow(row_position)
+        
+        # Tạo progress bar cho cột tiến độ
+        progress_bar = QProgressBar()
+        progress_bar.setRange(0, 100)
+        progress_bar.setValue(0)
+        
+        # Tạo các item cho bảng từ video_data
+        items = [
+            QTableWidgetItem(str(video_data.get('title', ''))),
+            QTableWidgetItem(str(video_data.get('views', 0))),
+            QTableWidgetItem(str(video_data.get('likes', 0))), 
+            QTableWidgetItem(str(video_data.get('duration', ''))),
+            QTableWidgetItem('pending'),
+            QTableWidgetItem('0%'),
+            QTableWidgetItem(str(video_data.get('url', ''))),
+            QTableWidgetItem(str(video_data.get('id', ''))),
+            QTableWidgetItem(''),
+            QTableWidgetItem('')  # record_id sẽ được cập nhật sau khi insert vào DB
+        ]
+        
+        for i, item in enumerate(items):
+            self.table.setItem(row_position, i, item)
+            
+        self.table.setCellWidget(row_position, TableColumns.PROGRESS, progress_bar)
+        
     def clear_table(self):
         """Xóa tất cả dữ liệu trong bảng"""
         self.table.setRowCount(0)
@@ -73,7 +102,22 @@ class VideoTableManager:
         """Tải dữ liệu vào bảng"""
         self.clear_table()
         for row in data_rows:
-            self.add_row(*row)
+            # Xử lý dữ liệu từ database với cấu trúc mới
+            if len(row) >= 16:  # Cấu trúc mới với nhiều cột hơn
+                self.add_row(
+                    record_id=row[0],    # id
+                    title=row[2],        # title
+                    views=row[7],        # views
+                    likes=row[8],        # likes
+                    duration=row[5],     # duration
+                    status=row[12],      # status
+                    progress=row[13],    # progress
+                    original_link=row[9], # url
+                    video_id=row[1],     # video_id
+                    file_path=row[14]    # file_path
+                )
+            else:  # Cấu trúc cũ
+                self.add_row(*row)
             
     def update_video_status(self, record_id, status, progress=None):
         """Cập nhật trạng thái video trong bảng"""

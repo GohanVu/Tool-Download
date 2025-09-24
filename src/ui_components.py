@@ -670,6 +670,7 @@ class ControlSection(QWidget):
         self.search_button = None
         self.load_info_button = None
         self.auto_download_checkbox = None
+        self.status_label = None
         self.init_ui()
         
     def init_ui(self):
@@ -685,12 +686,31 @@ class ControlSection(QWidget):
         # Checkbox cho tải ngay sau khi load
         self.auto_download_checkbox = QCheckBox("Tải ngay sau khi load")
         
+        # Status label màu đỏ để hiển thị trạng thái
+        self.status_label = QLabel("Sẵn sàng")
+        self.status_label.hide()
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.status_label.setFixedWidth(120)
+        self.status_label.setFixedHeight(25)
+        self.status_label.setStyleSheet("""
+            QLabel {
+                background-color: #FF4444;
+                border: 1px solid #CC0000;
+                border-radius: 6px;
+                color: white;
+                font-weight: bold;
+                font-size: 11px;
+                padding: 4px 8px;
+            }
+        """)
+        
         # Thêm vào layout
         layout.addWidget(self.pause_button)
         layout.addWidget(self.clear_button)
         layout.addWidget(self.search_button)
         layout.addWidget(self.load_info_button)
         layout.addWidget(self.auto_download_checkbox)
+        layout.addWidget(self.status_label)
         layout.addStretch()
         
     def connect_signals(self, pause_callback, clear_callback, 
@@ -704,6 +724,63 @@ class ControlSection(QWidget):
     def is_auto_download_enabled(self):
         """Kiểm tra xem auto download có được bật không"""
         return self.auto_download_checkbox.isChecked()
+        
+    def update_status(self, status_text, status_type="info"):
+        """Cập nhật trạng thái hiển thị trên status label
+        
+        Args:
+            status_text (str): Text hiển thị trạng thái
+            status_type (str): Loại trạng thái - "info", "loading", "success", "error", "warning"
+        """
+        if not self.status_label:
+            return
+            
+        # Định nghĩa màu sắc cho các loại trạng thái
+        status_colors = {
+            "info": ("#4A90E2", "#2E5BBA"),      # Xanh dương
+            "loading": ("#FF9500", "#CC7700"),    # Cam
+            "success": ("#4CAF50", "#388E3C"),    # Xanh lá
+            "error": ("#FF4444", "#CC0000"),      # Đỏ
+            "warning": ("#FF9800", "#F57C00"),    # Cam vàng
+            "ready": ("#9E9E9E", "#757575")       # Xám
+        }
+        
+        # Lấy màu sắc theo loại trạng thái, mặc định là info
+        bg_color, border_color = status_colors.get(status_type, status_colors["info"])
+        
+        # Cập nhật text và style
+        self.status_label.setText(status_text)
+        self.status_label.setStyleSheet(f"""
+            QLabel {{
+                background-color: {bg_color};
+                border: 1px solid {border_color};
+                border-radius: 6px;
+                color: white;
+                font-weight: bold;
+                font-size: 11px;
+                padding: 4px 8px;
+            }}
+        """)
+        
+    def set_loading_status(self, message="Đang tải..."):
+        """Đặt trạng thái loading"""
+        self.update_status(message, "loading")
+        
+    def set_success_status(self, message="Thành công"):
+        """Đặt trạng thái thành công"""
+        self.update_status(message, "success")
+        
+    def set_error_status(self, message="Lỗi"):
+        """Đặt trạng thái lỗi"""
+        self.update_status(message, "error")
+        
+    def set_ready_status(self, message="Sẵn sàng"):
+        """Đặt trạng thái sẵn sàng"""
+        self.update_status(message, "ready")
+        
+    def set_info_status(self, message="Thông tin"):
+        """Đặt trạng thái thông tin"""
+        self.update_status(message, "info")
 
 
 class MultipleLinksDialog(QDialog):
