@@ -4,9 +4,12 @@ Chứa giao diện chính của ứng dụng
 """
 
 import asyncio
+import time
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QTableWidget, 
                              QInputDialog)
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
+
+from src.yt_loader import YoutuberAssistant
 from .ui_components import InputSection, ControlSection, MultipleLinksDialog
 from .table_manager import VideoTableManager
 from .platform_detector import PlatformDetector
@@ -79,11 +82,21 @@ class VideoDownloaderApp(QMainWindow):
         
     def start_download(self):
         """Bắt đầu tải xuống"""
+        # Cập nhật trạng thái loading
+        self.control_section.set_loading_status("Đang bắt đầu tải...")
+        
+        # Lấy giá trị filter
+        filter_values = self.input_section.get_filter_values()
+        
         if self.input_section.is_multiple_links_mode():
             links_count = self.input_section.get_multiple_links_count()
             self.message_manager.download_started(links_count)
+            self.control_section.set_loading_status(f"Đang tải {links_count} video...")
+            print(f"Filter values: {filter_values}")
         else:
             self.message_manager.download_started()
+            self.control_section.set_loading_status("Đang tải video...")
+            print(f"Filter values: {filter_values}")
         
     def open_multiple_links_dialog(self):
         """Mở cửa sổ nhập nhiều link"""
@@ -134,7 +147,12 @@ class VideoDownloaderApp(QMainWindow):
         
     def pause_download(self):
         """Tạm dừng tải xuống"""
+        try:
+            self.yt_assistant._isForceClosed = True
+        except Exception as e:
+            pass
         self.message_manager.download_paused()
+        self.control_section.set_info_status("Đã tạm dừng")
         
     def clear_all(self):
         """Xóa tất cả dữ liệu"""
@@ -144,21 +162,76 @@ class VideoDownloaderApp(QMainWindow):
     async def _clear_all_async(self):
         """Async function để xóa tất cả dữ liệu"""
         try:
+            self.control_section.set_loading_status("Đang xóa dữ liệu...")
             await self.db_manager.delete_all_videos()
             self.table_manager.clear_table()
             self.message_manager.clear_all_success()
+            self.control_section.set_success_status("Đã xóa tất cả")
         except Exception as e:
             self.message_manager.clear_all_error(str(e))
+            self.control_section.set_error_status("Lỗi xóa dữ liệu")
                 
     def search_videos(self):
         """Tìm kiếm video"""
         keyword, ok = QInputDialog.getText(self, "Tìm kiếm", "Nhập từ khóa tìm kiếm:")
         if ok and keyword:
+            self.control_section.set_loading_status("Đang tìm kiếm...")
             asyncio.create_task(self._search_videos_async(keyword))
             
     def load_video_info(self):
         """Load thông tin video"""
-        self.message_manager.load_info_placeholder()
+        # Cập nhật trạng thái loading
+        self.control_section.set_loading_status("Đang load thông tin...")
+        
+        # Lấy 7 giá trị từ các ô input và filter
+        platform = self.input_section.platform_display.text()
+        link = self.input_section.link_input.text()
+        threads = self.input_section.threads_spinbox.value()
+        
+        # Lấy giá trị từ filter
+        filter_values = self.input_section.get_filter_values()
+        max_videos = filter_values['max_videos']
+        min_views = filter_values['min_videos']  # Lưu ý: tên method là get_min_videos nhưng thực tế là min_views
+        min_likes = filter_values['min_likes']
+        min_duration = filter_values['min_duration']
+        
+        
+        self.yt_assistant = YoutuberAssistant(platform, link, threads, max_videos, min_views, min_likes, min_duration)
+        self.yt_assistant.load_info_signal.connect(self.load_info_signal)
+        self.yt_assistant.update_rowInfo_signal.connect(self.update_rowInfo_signal)
+        # self.mang.append(yt_assistant)
+        self.yt_assistant.start()
+        
+        # self.message_manager.load_info_placeholder()
+    
+    def update_rowInfo_signal(self, data, dal):
+        """Cập nhật dữ liệu vào bảng và database"""
+        # Cập nhật bảng UI trước
+        self.table_manager.add_video_row(data)
+        
+        # Tự động insert vào database sử dụng QTimer
+        def insert_to_db():
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(self._insert_video_to_db(data))
+                loop.close()
+            except Exception as e:
+                print(f"Lỗi insert video vào database: {e}")
+        
+        QTimer.singleShot(0, insert_to_db)
+    
+    
+    def load_info_signal(self, value, message):
+        # print(f'load_info_signal: {value}')
+        # Cập nhật trạng thái khi nhận signal
+        if value:
+            # self.control_section.set_success_status("Load thông tin thành công")
+            self.control_section.status_label.show()
+            self.control_section.status_label.setText(message)
+        else:
+            self.control_section.status_label.hide()
+            # self.control_section.set_error_status("Load thông tin thất bại")
         
     def detect_platform(self, text):
         """Phát hiện platform từ link"""
@@ -175,8 +248,10 @@ class VideoDownloaderApp(QMainWindow):
         try:
             results = await self.db_manager.search_videos(keyword)
             self.table_manager.load_data(results)
+            self.control_section.set_success_status(f"Tìm thấy {len(results)} kết quả")
         except Exception as e:
             self.message_manager.search_error(str(e))
+            self.control_section.set_error_status("Lỗi tìm kiếm")
             
     async def load_data_from_db(self):
         """Tải dữ liệu từ database vào bảng"""
@@ -185,6 +260,14 @@ class VideoDownloaderApp(QMainWindow):
             self.table_manager.load_data(rows)
         except Exception as e:
             print(f"Lỗi tải dữ liệu: {e}")
+            
+    async def _insert_video_to_db(self, video_data):
+        """Insert video data vào database"""
+        try:
+            await self.db_manager.insert_video(video_data)
+            print(f"Đã lưu video: {video_data.get('title', 'Unknown')}")
+        except Exception as e:
+            print(f"Lỗi lưu video vào database: {e}")
             
     async def update_video_status(self, record_id, status, progress=None):
         """Cập nhật trạng thái video"""

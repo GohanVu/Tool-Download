@@ -3,6 +3,7 @@ Database Manager cho Video Downloader Tool
 Quản lý các thao tác với database
 """
 
+import json
 from .DBF import Database, insert_db, fetch_all, fetch_one, update_db
 from .constants import DownloadStatus
 
@@ -27,14 +28,19 @@ class VideoDatabaseManager:
         create_table_sql = '''
             CREATE TABLE IF NOT EXISTS videos (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                video_id TEXT UNIQUE,
                 title TEXT,
+                desc TEXT,
+                tags TEXT,
+                duration TEXT,
+                thumb_url TEXT,
                 views INTEGER,
                 likes INTEGER,
-                duration TEXT,
+                url TEXT,
+                pvf TEXT,
+                paf TEXT,
                 status TEXT DEFAULT 'pending',
                 progress INTEGER DEFAULT 0,
-                original_link TEXT,
-                video_id TEXT,
                 file_path TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -42,31 +48,37 @@ class VideoDatabaseManager:
         '''
         await self.db.execute_write(create_table_sql)
         
-    async def insert_video(self, title, views, likes, duration, original_link, 
-                          video_id=None, file_path=None, status=DownloadStatus.PENDING):
+    async def insert_video(self, video_data):
         """
-        Thêm video mới vào database
+        Thêm video mới vào database từ dict data
         
         Args:
-            title (str): Tiêu đề video
-            views (int): Lượt xem
-            likes (int): Lượt like
-            duration (str): Thời lượng
-            original_link (str): Link gốc
-            video_id (str): ID video
-            file_path (str): Đường dẫn file
-            status (str): Trạng thái
+            video_data (dict): Dữ liệu video từ yt_loader
             
         Returns:
             int: ID của record vừa tạo
         """
         insert_sql = '''
-            INSERT INTO videos (title, views, likes, duration, original_link, 
-                              video_id, file_path, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO videos (video_id, title, desc, tags, duration, 
+                              thumb_url, views, likes, url, pvf, paf, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         '''
-        return await insert_db(insert_sql, title, views, likes, duration, 
-                              original_link, video_id, file_path, status)
+        # Chuyển đổi tags từ list thành string
+        tags_str = json.dumps(video_data.get('tags', [])) if video_data.get('tags') else None
+        
+        return await insert_db(insert_sql, 
+                              video_data.get('id'),
+                              video_data.get('title'),
+                              video_data.get('desc'),
+                              tags_str,
+                              video_data.get('duration'),
+                              video_data.get('thumb_url'),
+                              video_data.get('views'),
+                              video_data.get('likes'),
+                              video_data.get('url'),
+                              video_data.get('pvf'),
+                              video_data.get('paf'),
+                              DownloadStatus.PENDING)
                               
     async def get_all_videos(self):
         """Lấy tất cả video từ database"""
